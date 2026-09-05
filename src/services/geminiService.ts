@@ -36,9 +36,6 @@ async function callAIWithRetry(prompt: string, modelName = "gemini-2.5-flash", m
   for (let i = 0; i < maxRetries; i++) {
     try {
       const config: any = {};
-      if (currentModel.startsWith("gemini-2.5") || currentModel.startsWith("gemini-3")) {
-        config.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
-      }
       
       const response = await ai.models.generateContent({
         model: currentModel,

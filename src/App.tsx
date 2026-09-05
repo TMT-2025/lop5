@@ -96,11 +96,19 @@ export default function App() {
   }, [showPaywall]);
 
   React.useEffect(() => {
+    // Sync default API key from environment if not yet set in localStorage
+    const defaultEnvKey = process.env.GEMINI_API_KEY || '';
+    const storedKey = localStorage.getItem('khbd_gemini_api_key') || '';
+    if (defaultEnvKey && (!storedKey || !storedKey.trim())) {
+      localStorage.setItem('khbd_gemini_api_key', defaultEnvKey);
+      setApiKey(defaultEnvKey);
+    }
+
     // Generate or load Device ID
     let storedDeviceId = localStorage.getItem('khbd_device_id');
     if (!storedDeviceId) {
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
-      storedDeviceId = `KHBD-V3-${rand}`;
+      storedDeviceId = `KHBD-L5-${rand}`;
       localStorage.setItem('khbd_device_id', storedDeviceId);
     }
     setDeviceId(storedDeviceId);
@@ -113,19 +121,11 @@ export default function App() {
       setCredits(parseInt(storedCredits, 10));
       setTier(storedTier);
     } else {
-      // Migrate or use default
-      const storedPremium = localStorage.getItem('khbd_is_premium');
-      if (storedPremium === 'true' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        setCredits(9999);
-        setTier('pro');
-        localStorage.setItem('khbd_credits', '9999');
-        localStorage.setItem('khbd_tier', 'pro');
-      } else {
-        setCredits(2);
-        setTier('free');
-        localStorage.setItem('khbd_credits', '2');
-        localStorage.setItem('khbd_tier', 'free');
-      }
+      // Default to Pro mode with 9999 credits
+      setCredits(9999);
+      setTier('pro');
+      localStorage.setItem('khbd_credits', '9999');
+      localStorage.setItem('khbd_tier', 'pro');
     }
   }, []);
 
