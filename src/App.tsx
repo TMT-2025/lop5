@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, CheckCircle2, Download, Loader2, ChevronRight, BookOpen, GraduationCap, X, Sparkles, Lock, CreditCard, ShieldCheck, Copy, Check, QrCode } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Download, Loader2, ChevronRight, BookOpen, GraduationCap, X, Sparkles, Lock, CreditCard, ShieldCheck, Copy, Check, QrCode, Key, Eye, EyeOff } from 'lucide-react';
 import mammoth from 'mammoth';
 import { integrateNLS, generateLessonPlan } from './services/geminiService';
 import { generateDocx } from './services/docxService';
@@ -42,6 +42,15 @@ export default function App() {
   const [selectedLesson, setSelectedLesson] = useState<LessonItem>(initialLessons[0]);
   const [periods, setPeriods] = useState<number>(initialLessons[0]?.periods || 3);
   const [customPeriods, setCustomPeriods] = useState<number | null>(null);
+
+  // Gemini API Key State
+  const [apiKey, setApiKey] = useState<string>(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('khbd_gemini_api_key')) || process.env.GEMINI_API_KEY || '';
+  });
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [showKeyText, setShowKeyText] = useState<boolean>(false);
+  const [apiKeySavedSuccess, setApiKeySavedSuccess] = useState<boolean>(false);
 
   const effectivePeriods = customPeriods !== null ? customPeriods : periods;
 
@@ -456,6 +465,13 @@ export default function App() {
   };
 
   const processFile = async () => {
+    const activeKey = (typeof window !== 'undefined' && localStorage.getItem('khbd_gemini_api_key')) || process.env.GEMINI_API_KEY || '';
+    if (!activeKey || !activeKey.trim()) {
+      setApiKeyInput('');
+      setShowApiKeyModal(true);
+      setError('Vui lòng cấu hình Gemini API Key để bắt đầu tạo Kế hoạch bài dạy.');
+      return;
+    }
     if (credits <= 0) {
       setShowPaywall(true);
       return;
@@ -594,6 +610,22 @@ export default function App() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setApiKeyInput((typeof window !== 'undefined' && localStorage.getItem('khbd_gemini_api_key')) || '');
+              setShowApiKeyModal(true);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 border transition-all cursor-pointer shadow-xs",
+              apiKey 
+                ? "bg-emerald-600/90 hover:bg-emerald-600 text-white border-emerald-400" 
+                : "bg-amber-500 hover:bg-amber-600 text-slate-900 border-amber-300 animate-pulse"
+            )}
+            title="Cấu hình Gemini API Key"
+          >
+            <Key className="w-3.5 h-3.5" />
+            {apiKey ? "API Key: Đã bật" : "Cài đặt API Key"}
+          </button>
           {tier === 'pro' ? (
             <button
               onClick={() => { setPaywallTab('pay'); setShowPaywall(true); }}

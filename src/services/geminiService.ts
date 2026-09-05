@@ -1,20 +1,35 @@
-﻿import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
-const API_KEY = process.env.GEMINI_API_KEY || "";
-const ai = new GoogleGenAI({
-  apiKey: API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
+export function getStoredApiKey(): string {
+  if (typeof window !== 'undefined') {
+    const fromStorage = localStorage.getItem('khbd_gemini_api_key');
+    if (fromStorage && fromStorage.trim()) return fromStorage.trim();
+  }
+  return process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+}
+
+function getGenAIClient(apiKey: string) {
+  return new GoogleGenAI({
+    apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
     },
-  },
-});
+  });
+}
 
 /**
  * Helper to call Gemini API with retry logic for rate limiting (429), spikes in demand (503),
  * status UNAVAILABLE, and dynamic model fallback.
  */
-async function callAIWithRetry(prompt: string, modelName = "gemini-2.5-flash", maxRetries = 6) {
+async function callAIWithRetry(prompt: string, modelName = "gemini-2.5-flash", maxRetries = 5) {
+  const apiKey = getStoredApiKey();
+  if (!apiKey) {
+    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng bấm nút 'Cài đặt API Key' ở thanh tiêu đề để nhập khóa API.");
+  }
+  
+  const ai = getGenAIClient(apiKey);
   let lastError: any;
   let currentModel = modelName;
   
@@ -46,22 +61,22 @@ async function callAIWithRetry(prompt: string, modelName = "gemini-2.5-flash", m
       const isUnavailable = errorMessage.includes("503") || 
                              errorMessage.includes("unavailable") || 
                              errorMessage.includes("demand") || 
-                             errorMessage.includes("clogged") ||
-                             errorMessage.includes("busy") ||
-                             errorMessage.includes("overload") ||
-                             errorMessage.includes("temporary") ||
-                             errorMessage.includes("try again") ||
-                             errorStatus.includes("unavailable") ||
+                             errorMessage.includes("clogged") || 
+                             errorMessage.includes("busy") || 
+                             errorMessage.includes("overload") || 
+                             errorMessage.includes("temporary") || 
+                             errorMessage.includes("try again") || 
+                             errorStatus.includes("unavailable") || 
                              errorCode === "503";
 
       const isRetryable = isRateLimit || isUnavailable;
       
       if (isRetryable) {
-        if (i >= 2) {
+        if (i >= 1) {
           if (currentModel === "gemini-2.5-flash") {
-            currentModel = "gemini-2.5-flash-lite";
-          } else if (currentModel === "gemini-2.5-flash-lite") {
             currentModel = "gemini-2.0-flash";
+          } else if (currentModel === "gemini-2.0-flash") {
+            currentModel = "gemini-1.5-flash";
           }
         }
         
@@ -69,6 +84,10 @@ async function callAIWithRetry(prompt: string, modelName = "gemini-2.5-flash", m
         console.warn(`Gemini API retryable error. Retrying in ${Math.round(waitTime)}ms... (Attempt ${i + 1}/${maxRetries}, Model: ${currentModel})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
+      }
+      
+      if (errorMessage.includes("api_key_invalid") || errorMessage.includes("api key not valid") || errorMessage.includes("invalid api key")) {
+        throw new Error("Gemini API Key không hợp lệ. Vui lòng kiểm tra lại mã khóa đã nhập.");
       }
       
       throw error;
@@ -87,13 +106,14 @@ export const NLS_FRAMEWORK_PRIMARY = {
     { id: "5", name: "Giải quyết vấn đề", sub: ["5.1. Xử lý sự cố kỹ thuật đơn giản", "5.2. Chọn công cụ số phù hợp nhiệm vụ học tập", "5.3. Sáng tạo với phần mềm học tập", "5.4. Tự tin phát triển kỹ năng số"] },
     { id: "6", name: "Ứng dụng trí tuệ nhân tạo (AI)", sub: ["6.1. Nhận biết và hiểu về AI xung quanh em", "6.2. Sử dụng AI có đạo đức, trung thực trong học tập", "6.3. Đánh giá kết quả từ công cụ AI"] }
   ],
-  levelCode: "CB1", // Cơ bản 1 cho cấp Tiểu học
+  levelCode: "CB1",
   levelName: "Cơ bản 1 (Lớp 1 - 5)"
 };
 
 export async function integrateNLS(content: string, subject: string, grade = "Lớp 5") {
-  if (!API_KEY) {
-    throw new Error("API Key không tồn tại. Vui lòng kiểm tra cấu hình.");
+  const apiKey = getStoredApiKey();
+  if (!apiKey) {
+    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng bấm nút 'Cài đặt API Key' ở góc trên để nhập khóa API.");
   }
 
   const prompt = `
@@ -186,18 +206,25 @@ export async function integrateNLS(content: string, subject: string, grade = "L�
     return responseText;
   } catch (error: any) {
     console.error("Gemini API Error (Integrate):", error);
-    const msg = error.message || "";
+    const msg = String(error?.message || "");
     if (msg.includes("120s")) throw error;
-    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-      throw new Error("Máy chủ AI đang quá tải (Hết lượt yêu cầu). Vui lòng chờ 30 giây rồi nhấn thử lại.");
+    if (msg.includes("Chưa cấu hình Gemini API Key") || msg.includes("API Key")) {
+      throw error;
     }
-    throw new Error("Không thể kết nối với máy chủ AI hoặc nội dung bị từ chối. Vui lòng thử lại sau.");
+    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")) {
+      throw new Error("Máy chủ AI đang tạm thời quá tải hoặc hết hạn ngạch miễn phí (429 Quota). Vui lòng đợi 30 giây rồi nhấn thử lại.");
+    }
+    if (msg.includes("API_KEY_INVALID") || msg.includes("api key not valid") || msg.includes("invalid api key") || msg.includes("400") || msg.includes("403")) {
+      throw new Error("Gemini API Key không hợp lệ hoặc bị khóa. Vui lòng vào 'Cài đặt API Key' để kiểm tra lại.");
+    }
+    throw new Error(msg || "Không thể kết nối với máy chủ AI. Vui lòng kiểm tra lại kết nối và thử lại.");
   }
 }
 
 export async function generateLessonPlan(lessonName: string, periods: number, subject: string, grade = "Lớp 5") {
-  if (!API_KEY) {
-    throw new Error("API Key không tồn tại. Vui lòng kiểm tra cấu hình.");
+  const apiKey = getStoredApiKey();
+  if (!apiKey) {
+    throw new Error("Chưa cấu hình Gemini API Key. Vui lòng bấm nút 'Cài đặt API Key' ở góc trên để nhập khóa API.");
   }
 
   const prompt = `
@@ -336,11 +363,17 @@ export async function generateLessonPlan(lessonName: string, periods: number, su
     return responseText;
   } catch (error: any) {
     console.error("Gemini API Error (Generate):", error);
-    const msg = error.message || "";
+    const msg = String(error?.message || "");
     if (msg.includes("120s")) throw error;
-    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-      throw new Error("Máy chủ AI đang quá tải (Hết lượt yêu cầu). Vui lòng chờ 30 giây rồi nhấn thử lại.");
+    if (msg.includes("Chưa cấu hình Gemini API Key") || msg.includes("API Key")) {
+      throw error;
     }
-    throw new Error("Không thể kết nối với máy chủ AI hoặc nội dung bị từ chối. Vui lòng thử lại sau.");
+    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")) {
+      throw new Error("Máy chủ AI đang tạm thời quá tải hoặc hết hạn ngạch miễn phí (429 Quota). Vui lòng đợi 30 giây rồi nhấn thử lại.");
+    }
+    if (msg.includes("API_KEY_INVALID") || msg.includes("api key not valid") || msg.includes("invalid api key") || msg.includes("400") || msg.includes("403")) {
+      throw new Error("Gemini API Key không hợp lệ hoặc bị khóa. Vui lòng vào 'Cài đặt API Key' để kiểm tra lại.");
+    }
+    throw new Error(msg || "Không thể kết nối với máy chủ AI. Vui lòng kiểm tra lại kết nối và thử lại.");
   }
 }
