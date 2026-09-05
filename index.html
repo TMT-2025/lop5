@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KHBD Lớp 5 - Kế hoạch bài dạy Tiếng Việt & Toán (CV 2345 - Năng lực số & AI)</title>
+    <meta name="description" content="Ứng dụng tạo Kế hoạch bài dạy môn Tiếng Việt và môn Toán Lớp 5 chuẩn Công văn 2345/BGDĐT-GDTH, tích hợp Năng lực số và Giáo dục AI theo TT 32/2018 và QĐ 2422/QĐ-BGDĐT." />
+    <script>
+      // Definitive fix for "Cannot set property fetch of #<Window> which has only a getter"
+      (function() {
+        window.global = window;
+        window.process = { 
+          env: { NODE_ENV: 'development' },
+          version: '',
+          nextTick: (cb) => setTimeout(cb, 0)
+        };
+        
+        try {
+          const originalFetch = window.fetch;
+          if (originalFetch) {
+            Object.defineProperty(window, 'fetch', {
+              configurable: true,
+              enumerable: true,
+              get: function() { return originalFetch; },
+              // This setter prevents the "only a getter" error when libraries try to assign to fetch
+              set: function(v) { 
+                console.warn('A library attempted to overwrite window.fetch. This action was blocked to prevent errors.');
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Failed to protect window.fetch:', e);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
