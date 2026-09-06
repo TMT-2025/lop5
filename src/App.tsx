@@ -125,19 +125,22 @@ export default function App() {
     }
     setDeviceId(storedDeviceId);
 
-    // Load Credits & Tier
+    // Load Credits & Tier (Mặc định 2 lượt tải cho người dùng mới, không để vô hạn)
     const storedCredits = localStorage.getItem('khbd_credits');
     const storedTier = localStorage.getItem('khbd_tier') as 'free' | 'vip' | 'pro' | null;
+    const isAdminUnlimited = localStorage.getItem('khbd_admin_unlimited') === 'true';
 
-    if (storedCredits !== null && storedTier !== null) {
-      setCredits(parseInt(storedCredits, 10));
+    const parsedCredits = storedCredits !== null ? parseInt(storedCredits, 10) : NaN;
+
+    if (!isNaN(parsedCredits) && storedTier !== null && (parsedCredits < 9000 || isAdminUnlimited)) {
+      setCredits(parsedCredits);
       setTier(storedTier);
     } else {
-      // Default to Pro mode with 9999 credits
-      setCredits(9999);
-      setTier('pro');
-      localStorage.setItem('khbd_credits', '9999');
-      localStorage.setItem('khbd_tier', 'pro');
+      // Mặc định ban đầu: 2 lượt tải dùng thử
+      setCredits(2);
+      setTier('free');
+      localStorage.setItem('khbd_credits', '2');
+      localStorage.setItem('khbd_tier', 'free');
     }
   }, []);
 
@@ -709,10 +712,11 @@ export default function App() {
           ) : (
             <button 
               onClick={() => { setPaywallTab('pay'); setShowPaywall(true); }}
-              className="bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white px-4 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
+              className="bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 px-4 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 border border-amber-400/40 shadow-xs transition-all cursor-pointer"
+              title="Nhấn để xem gói lượt tải hoặc nâng cấp"
             >
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-ping" />
-              Dùng thử: {credits} lượt tải
+              <div className={cn("w-2 h-2 rounded-full", credits <= 0 ? "bg-red-500" : "bg-green-500 animate-ping")} />
+              {credits <= 0 ? 'Hết lượt tải' : `Dùng thử: ${credits} lượt tải`}
             </button>
           )}
         </div>
@@ -1263,6 +1267,7 @@ export default function App() {
                           setTier('pro');
                           localStorage.setItem('khbd_credits', '9999');
                           localStorage.setItem('khbd_tier', 'pro');
+                          localStorage.setItem('khbd_admin_unlimited', 'true');
                           alert("Đã kích hoạt chế độ VIP Vô hạn cho thiết bị này!");
                           setShowPaywall(false);
                           setShowAdminPanel(false);
